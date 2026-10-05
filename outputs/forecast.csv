@@ -1,0 +1,73 @@
+diabetes_class,year,fills,type
+GLP-1 receptor agonists,2019,795852.1000000001,actual
+GLP-1 receptor agonists,2020,895434.9000000006,actual
+GLP-1 receptor agonists,2021,1130440.1000000003,actual
+GLP-1 receptor agonists,2022,1393934.1,actual
+GLP-1 receptor agonists,2023,1850184.6999999995,actual
+GLP-1 receptor agonists,2024,2402754.3000000017,actual
+GLP-1 receptor agonists,2025,2955324.0,base_case
+GLP-1 receptor agonists,2026,3507893.0,base_case
+GLP-1 receptor agonists,2025,3396637.0,upside_case
+GLP-1 receptor agonists,2026,4293635.0,upside_case
+GLP-1 receptor agonists,2025,2690536.0,downside_case
+GLP-1 receptor agonists,2026,2984066.0,downside_case
+SGLT2 inhibitors,2019,880458.1999999998,actual
+SGLT2 inhibitors,2020,1065508.6,actual
+SGLT2 inhibitors,2021,1244437.5000000005,actual
+SGLT2 inhibitors,2022,1410187.5000000007,actual
+SGLT2 inhibitors,2023,1550148.5000000005,actual
+SGLT2 inhibitors,2024,1978160.9,actual
+SGLT2 inhibitors,2025,1946072.0,base_case
+SGLT2 inhibitors,2026,2110035.0,base_case
+SGLT2 inhibitors,2025,2214738.0,upside_case
+SGLT2 inhibitors,2026,2546987.0,upside_case
+SGLT2 inhibitors,2025,1784873.0,downside_case
+SGLT2 inhibitors,2026,1818733.0,downside_case
+DPP-4 inhibitors,2019,614840.1999999998,actual
+DPP-4 inhibitors,2020,558563.2999999995,actual
+DPP-4 inhibitors,2021,495474.39999999985,actual
+DPP-4 inhibitors,2022,453793.8000000001,actual
+DPP-4 inhibitors,2023,427535.4000000001,actual
+DPP-4 inhibitors,2024,351956.89999999973,actual
+DPP-4 inhibitors,2025,308775.0,base_case
+DPP-4 inhibitors,2026,258798.0,base_case
+DPP-4 inhibitors,2025,336067.0,upside_case
+DPP-4 inhibitors,2026,293110.0,upside_case
+DPP-4 inhibitors,2025,292400.0,downside_case
+DPP-4 inhibitors,2026,235923.0,downside_case
+Insulin,2019,1496112.900000001,actual
+Insulin,2020,1455941.6,actual
+Insulin,2021,1384869.4999999995,actual
+Insulin,2022,1360182.5999999996,actual
+Insulin,2023,1353101.3999999994,actual
+Insulin,2024,1352110.699999999,actual
+Insulin,2025,1352111.0,base_case
+Insulin,2026,1352111.0,base_case
+Insulin,2025,1352606.0,upside_case
+Insulin,2026,1352853.0,upside_case
+Insulin,2025,1351814.0,downside_case
+Insulin,2026,1351616.0,downside_case
+Biguanides,2019,876447.3999999987,actual
+Biguanides,2020,981701.1999999996,actual
+Biguanides,2021,956603.8000000012,actual
+Biguanides,2022,973716.7,actual
+Biguanides,2023,930217.2999999996,actual
+Biguanides,2024,875780.0,actual
+Biguanides,2025,932411.0,base_case
+Biguanides,2026,932411.0,base_case
+Biguanides,2025,959694.0,upside_case
+Biguanides,2026,973335.0,upside_case
+Biguanides,2025,916041.0,downside_case
+Biguanides,2026,905128.0,downside_case
+Sulfonylureas,2019,799975.9999999998,actual
+Sulfonylureas,2020,746377.1000000003,actual
+Sulfonylureas,2021,705248.0000000002,actual
+Sulfonylureas,2022,683009.7999999996,actual
+Sulfonylureas,2023,587013.3999999999,actual
+Sulfonylureas,2024,581135.8000000003,actual
+Sulfonylureas,2025,524339.0,base_case
+Sulfonylureas,2026,478781.0,base_case
+Sulfonylureas,2025,526965.0,upside_case
+Sulfonylureas,2026,482377.0,upside_case
+Sulfonylureas,2025,522764.0,downside_case
+Sulfonylureas,2026,476384.0,downside_case

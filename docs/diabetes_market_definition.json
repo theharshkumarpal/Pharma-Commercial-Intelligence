@@ -1,0 +1,127 @@
+{
+  "market": "Diabetes therapies in Medicare Part D",
+  "classification_source": "RxNorm/RxClass API + curated mapping",
+  "categories": {
+    "Insulin": 5,
+    "GLP-1 receptor agonists": 4,
+    "SGLT2 inhibitors": 4,
+    "DPP-4 inhibitors": 3,
+    "Other diabetes therapies": 2,
+    "Sulfonylureas": 2,
+    "Biguanides": 1,
+    "Thiazolidinediones": 1
+  },
+  "total_drugs": 22,
+  "drugs": [
+    {
+      "brand_name": "SYMLINPEN 120",
+      "generic_name": "PRAMLINTIDE ACETATE",
+      "diabetes_class": "Other diabetes therapies"
+    },
+    {
+      "brand_name": "JANUVIA",
+      "generic_name": "SITAGLIPTIN",
+      "diabetes_class": "DPP-4 inhibitors"
+    },
+    {
+      "brand_name": "OZEMPIC",
+      "generic_name": "SEMAGLUTIDE",
+      "diabetes_class": "GLP-1 receptor agonists"
+    },
+    {
+      "brand_name": "TOUJEO",
+      "generic_name": "INSULIN GLARGINE",
+      "diabetes_class": "Insulin"
+    },
+    {
+      "brand_name": "TRULICITY",
+      "generic_name": "DULAGLUTIDE",
+      "diabetes_class": "GLP-1 receptor agonists"
+    },
+    {
+      "brand_name": "METFORMIN HYDROCHLORIDE",
+      "generic_name": "METFORMIN HCL",
+      "diabetes_class": "Biguanides"
+    },
+    {
+      "brand_name": "PIOGLITAZONE HYDROCHLORIDE",
+      "generic_name": "PIOGLITAZONE HCL",
+      "diabetes_class": "Thiazolidinediones"
+    },
+    {
+      "brand_name": "RYBELSUS",
+      "generic_name": "SEMAGLUTIDE",
+      "diabetes_class": "GLP-1 receptor agonists"
+    },
+    {
+      "brand_name": "TRESIBA",
+      "generic_name": "INSULIN DEGLUDEC",
+      "diabetes_class": "Insulin"
+    },
+    {
+      "brand_name": "GLIPIZIDE",
+      "generic_name": "GLIPIZIDE",
+      "diabetes_class": "Sulfonylureas"
+    },
+    {
+      "brand_name": "INVOKANA",
+      "generic_name": "CANAGLIFLOZIN",
+      "diabetes_class": "SGLT2 inhibitors"
+    },
+    {
+      "brand_name": "ONGLYZA",
+      "generic_name": "SAXAGLIPTIN",
+      "diabetes_class": "DPP-4 inhibitors"
+    },
+    {
+      "brand_name": "JARDIANCE",
+      "generic_name": "EMPAGLIFLOZIN",
+      "diabetes_class": "SGLT2 inhibitors"
+    },
+    {
+      "brand_name": "VICTOZA",
+      "generic_name": "LIRAGLUTIDE",
+      "diabetes_class": "GLP-1 receptor agonists"
+    },
+    {
+      "brand_name": "TRADJENTA",
+      "generic_name": "LINAGLIPTIN",
+      "diabetes_class": "DPP-4 inhibitors"
+    },
+    {
+      "brand_name": "LANTUS",
+      "generic_name": "INSULIN GLARGINE",
+      "diabetes_class": "Insulin"
+    },
+    {
+      "brand_name": "GLIMEPIRIDE",
+      "generic_name": "GLIMEPIRIDE",
+      "diabetes_class": "Sulfonylureas"
+    },
+    {
+      "brand_name": "FARXIGA",
+      "generic_name": "DAPAGLIFLOZIN",
+      "diabetes_class": "SGLT2 inhibitors"
+    },
+    {
+      "brand_name": "HUMALOG",
+      "generic_name": "INSULIN LISPRO",
+      "diabetes_class": "Insulin"
+    },
+    {
+      "brand_name": "CYCLOSET",
+      "generic_name": "BROMOCRIPTINE MESYLATE",
+      "diabetes_class": "Other diabetes therapies"
+    },
+    {
+      "brand_name": "STEGLATRO",
+      "generic_name": "ERTUGLIFLOZIN",
+      "diabetes_class": "SGLT2 inhibitors"
+    },
+    {
+      "brand_name": "NOVOLOG",
+      "generic_name": "INSULIN ASPART",
+      "diabetes_class": "Insulin"
+    }
+  ]
+}

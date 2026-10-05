@@ -1,0 +1,16 @@
+{
+  "row_counts_per_year": {
+    "2019": 24681,
+    "2020": 24725,
+    "2021": 24679,
+    "2022": 24734,
+    "2023": 24545,
+    "2024": 24440
+  },
+  "duplicate_key_combinations": 0,
+  "total_claims": 33465610.0,
+  "total_fills": 38493282.49999975,
+  "total_spending": 19321596176.989807,
+  "unique_providers": 4500,
+  "unique_drugs": 22
+}

@@ -1,0 +1,57 @@
+{
+  "Base (30/25/20/15/10)": {
+    "weights": {
+      "volume_score": 0.3,
+      "growth_score": 0.25,
+      "therapy_affinity_score": 0.2,
+      "geo_growth_score": 0.15,
+      "market_opportunity_score": 0.1
+    },
+    "top100_overlap_with_base": 100,
+    "stability_pct": 100.0
+  },
+  "Volume-heavy (45/15/15/15/10)": {
+    "weights": {
+      "volume_score": 0.45,
+      "growth_score": 0.15,
+      "therapy_affinity_score": 0.15,
+      "geo_growth_score": 0.15,
+      "market_opportunity_score": 0.1
+    },
+    "top100_overlap_with_base": 91,
+    "stability_pct": 91.0
+  },
+  "Growth-heavy (15/45/15/15/10)": {
+    "weights": {
+      "volume_score": 0.15,
+      "growth_score": 0.45,
+      "therapy_affinity_score": 0.15,
+      "geo_growth_score": 0.15,
+      "market_opportunity_score": 0.1
+    },
+    "top100_overlap_with_base": 73,
+    "stability_pct": 73.0
+  },
+  "Balanced (20/20/20/20/20)": {
+    "weights": {
+      "volume_score": 0.2,
+      "growth_score": 0.2,
+      "therapy_affinity_score": 0.2,
+      "geo_growth_score": 0.2,
+      "market_opportunity_score": 0.2
+    },
+    "top100_overlap_with_base": 66,
+    "stability_pct": 66.0
+  },
+  "Therapy-focused (20/20/35/15/10)": {
+    "weights": {
+      "volume_score": 0.2,
+      "growth_score": 0.2,
+      "therapy_affinity_score": 0.35,
+      "geo_growth_score": 0.15,
+      "market_opportunity_score": 0.1
+    },
+    "top100_overlap_with_base": 72,
+    "stability_pct": 72.0
+  }
+}

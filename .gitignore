@@ -1,0 +1,17 @@
+# Environment & IDE
+venv/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+.vscode/
+
+# Database files & heavy binary outputs
+*.duckdb
+*.duckdb.wal
+data/raw/
+data/processed/
+
+# Keep data structure but exclude giant generated files if needed
+# We can include output CSVs/JSONs or documentations
