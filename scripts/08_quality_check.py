@@ -7,9 +7,7 @@ import json
 import os
 import numpy as np
 import pandas as pd
-import duckdb
-
-DB_PATH = "data/hcproject.duckdb"
+from db import get_db_engine
 
 def run_quality_check():
     print("=" * 70)
@@ -27,94 +25,103 @@ def run_quality_check():
         checks[f"{category}/{name}"] = {"pass": condition, "detail": detail}
         print(f"  {status}  {name}{f' — {detail}' if detail else ''}")
 
-    con = duckdb.connect(DB_PATH, read_only=True)
+    engine = get_db_engine()
 
-    # ===== DATA CHECKS =====
-    print("\n--- DATA ---")
+    with engine.connect() as conn:
+        # ===== DATA CHECKS =====
+        print("\n--- DATA ---")
 
-    # 2019-2024 loaded
-    years = con.execute("SELECT DISTINCT year FROM fact_prescriptions ORDER BY year").fetchdf()["year"].tolist()
-    check("Data", "2019-2024 loaded", set(years) == {2019, 2020, 2021, 2022, 2023, 2024},
-          f"Years found: {years}")
+        # 2019-2024 loaded
+        years_df = pd.read_sql("SELECT DISTINCT year FROM fact_prescriptions ORDER BY year", conn)
+        years = years_df["year"].tolist()
+        check("Data", "2019-2024 loaded", set(years) == {2019, 2020, 2021, 2022, 2023, 2024},
+              f"Years found: {years}")
 
-    # No unexplained duplicates
-    dup_count = con.execute("""
-        SELECT COUNT(*) FROM (
-            SELECT year, npi, brand_name, generic_name, COUNT(*) as cnt
-            FROM fact_prescriptions
-            GROUP BY year, npi, brand_name, generic_name
-            HAVING COUNT(*) > 1
-        )
-    """).fetchone()[0]
-    check("Data", "No unexplained duplicates", dup_count == 0,
-          f"Duplicate key combinations: {dup_count}")
+        # No unexplained duplicates
+        dup_df = pd.read_sql("""
+            SELECT COUNT(*) as cnt FROM (
+                SELECT year, npi, brand_name, generic_name, COUNT(*) as cnt
+                FROM fact_prescriptions
+                GROUP BY year, npi, brand_name, generic_name
+                HAVING COUNT(*) > 1
+            ) sub
+        """, conn)
+        dup_count = dup_df["cnt"].iloc[0]
+        check("Data", "No unexplained duplicates", dup_count == 0,
+              f"Duplicate key combinations: {dup_count}")
 
-    # Suppression handled correctly (NOT replaced with zero)
-    supp_check = con.execute("""
-        SELECT COUNT(*) FROM fact_prescriptions
-        WHERE is_suppressed = true AND total_claims IS NOT NULL
-    """).fetchone()[0]
-    check("Data", "Suppression handled correctly",
-          supp_check == 0,
-          f"Suppressed records with non-null claims: {supp_check}")
+        # Suppression handled correctly (NOT replaced with zero)
+        supp_df = pd.read_sql("""
+            SELECT COUNT(*) as cnt FROM fact_prescriptions
+            WHERE is_suppressed = true AND total_claims IS NOT NULL
+        """, conn)
+        supp_check = supp_df["cnt"].iloc[0]
+        check("Data", "Suppression handled correctly",
+              supp_check == 0,
+              f"Suppressed records with non-null claims: {supp_check}")
 
-    # Drug mapping complete
-    drug_count = con.execute("SELECT COUNT(*) FROM dim_drug WHERE diabetes_class IS NOT NULL").fetchone()[0]
-    check("Data", "Drug mapping complete", drug_count > 0,
-          f"Diabetes drugs mapped: {drug_count}")
+        # Drug mapping complete
+        drug_df = pd.read_sql("SELECT COUNT(*) as cnt FROM dim_drug WHERE diabetes_class IS NOT NULL", conn)
+        drug_count = drug_df["cnt"].iloc[0]
+        check("Data", "Drug mapping complete", drug_count > 0,
+              f"Diabetes drugs mapped: {drug_count}")
 
-    # Diabetes market definition documented
-    doc_exists = os.path.exists("docs/diabetes_market_definition.json")
-    check("Data", "Diabetes market definition documented", doc_exists)
+        # Diabetes market definition documented
+        doc_exists = os.path.exists("docs/diabetes_market_definition.json")
+        check("Data", "Diabetes market definition documented", doc_exists)
 
-    # ===== ANALYTICS CHECKS =====
-    print("\n--- ANALYTICS ---")
+        # ===== ANALYTICS CHECKS =====
+        print("\n--- ANALYTICS ---")
 
-    # Market size calculated
-    check("Analytics", "Market size calculated",
-          os.path.exists("outputs/market_yearly.csv"),
-          f"Rows: {len(pd.read_csv('outputs/market_yearly.csv'))}" if os.path.exists("outputs/market_yearly.csv") else "")
+        # Market size calculated
+        check("Analytics", "Market size calculated",
+              os.path.exists("outputs/market_yearly.csv"),
+              f"Rows: {len(pd.read_csv('outputs/market_yearly.csv'))}" if os.path.exists("outputs/market_yearly.csv") else "")
 
-    # Market share calculated
-    check("Analytics", "Market share calculated",
-          os.path.exists("outputs/drug_yearly.csv"))
+        # Market share calculated
+        check("Analytics", "Market share calculated",
+              os.path.exists("outputs/drug_yearly.csv"))
 
-    # Growth calculated
-    market = pd.read_csv("outputs/market_yearly.csv") if os.path.exists("outputs/market_yearly.csv") else pd.DataFrame()
-    has_growth = "total_claims_yoy_growth" in market.columns if len(market) > 0 else False
-    check("Analytics", "Growth calculated", has_growth)
+        # Growth calculated
+        market = pd.read_csv("outputs/market_yearly.csv") if os.path.exists("outputs/market_yearly.csv") else pd.DataFrame()
+        has_growth = "total_claims_yoy_growth" in market.columns if len(market) > 0 else False
+        check("Analytics", "Growth calculated", has_growth)
 
-    # HCP features created
-    hcp_exists = os.path.exists("outputs/hcp_features.csv")
-    check("Analytics", "HCP features created", hcp_exists)
+        # HCP features created
+        hcp_exists = os.path.exists("outputs/hcp_features.csv")
+        check("Analytics", "HCP features created", hcp_exists)
 
-    # HCP clusters validated
-    cluster_exists = os.path.exists("outputs/cluster_analysis.json")
-    check("Analytics", "HCP clusters validated", cluster_exists)
+        # HCP clusters validated
+        cluster_exists = os.path.exists("outputs/cluster_analysis.json")
+        check("Analytics", "HCP clusters validated", cluster_exists)
 
-    # Adoption analysis completed
-    check("Analytics", "Adoption analysis completed",
-          "state_opportunity" in [t[0] for t in con.execute("SHOW TABLES").fetchall()])
+        # Adoption analysis completed
+        tables_df = pd.read_sql("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """, conn)
+        tables = tables_df["table_name"].tolist()
+        check("Analytics", "Adoption analysis completed", "state_opportunity" in tables)
 
-    # Geographic opportunity calculated
-    check("Analytics", "Geographic opportunity calculated",
-          os.path.exists("outputs/state_opportunity.csv"))
+        # Geographic opportunity calculated
+        check("Analytics", "Geographic opportunity calculated",
+              os.path.exists("outputs/state_opportunity.csv"))
 
-    # Opportunity score created
-    check("Analytics", "Opportunity score created",
-          os.path.exists("outputs/hcp_opportunity.csv"))
+        # Opportunity score created
+        check("Analytics", "Opportunity score created",
+              os.path.exists("outputs/hcp_opportunity.csv"))
 
-    # Sensitivity analysis completed
-    check("Analytics", "Sensitivity analysis completed",
-          os.path.exists("outputs/sensitivity_analysis.json"))
+        # Sensitivity analysis completed
+        check("Analytics", "Sensitivity analysis completed",
+              os.path.exists("outputs/sensitivity_analysis.json"))
 
-    # Forecast model backtested
-    check("Analytics", "Forecast model backtested",
-          os.path.exists("outputs/forecast_analysis.json"))
+        # Forecast model backtested
+        check("Analytics", "Forecast model backtested",
+              os.path.exists("outputs/forecast_analysis.json"))
 
-    # Statistical comparisons completed
-    check("Analytics", "Statistical comparisons completed",
-          os.path.exists("outputs/statistical_analysis.json"))
+        # Statistical comparisons completed
+        check("Analytics", "Statistical comparisons completed",
+              os.path.exists("outputs/statistical_analysis.json"))
 
     # ===== BUSINESS CHECKS =====
     print("\n--- BUSINESS ---")
@@ -195,12 +202,12 @@ def run_quality_check():
         "total_count": n_total,
     }
     with open("outputs/quality_check_report.json", "w") as f:
-        json.dump(quality_report, f, indent=2)
+        json.dump(quality_report, f, indent=2, default=str)
     print(f"\n  Full report saved to outputs/quality_check_report.json")
 
-    con.close()
     return all_pass
 
 
 if __name__ == "__main__":
     run_quality_check()
+

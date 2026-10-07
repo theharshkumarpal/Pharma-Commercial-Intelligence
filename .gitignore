@@ -15,3 +15,4 @@ data/processed/
 
 # Keep data structure but exclude giant generated files if needed
 # We can include output CSVs/JSONs or documentations
+.env

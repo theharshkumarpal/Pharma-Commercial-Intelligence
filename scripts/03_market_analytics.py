@@ -10,31 +10,29 @@ TASKS 9–13: Market Analytics
 import json
 import numpy as np
 import pandas as pd
-import duckdb
-
-DB_PATH = "data/hcproject.duckdb"
+from db import get_db_engine
 
 
-def get_diabetes_fact(con) -> pd.DataFrame:
+def get_diabetes_fact(conn) -> pd.DataFrame:
     """Get fact_prescriptions filtered to diabetes drugs only, non-suppressed."""
-    return con.execute("""
+    return pd.read_sql("""
         SELECT f.*
         FROM fact_prescriptions f
         JOIN dim_drug d ON f.drug_id = d.drug_id
         WHERE d.diabetes_class IS NOT NULL
           AND f.is_suppressed = false
-    """).fetchdf()
+    """, conn)
 
 
 # ===================================================================
 # TASK 9 — Annual market size
 # ===================================================================
-def task9_market_size(con) -> pd.DataFrame:
+def task9_market_size(conn) -> pd.DataFrame:
     print(f"\n{'='*60}")
     print("TASK 9 — Annual market size")
     print(f"{'='*60}")
 
-    market_yearly = con.execute("""
+    market_yearly = pd.read_sql("""
         SELECT
             f.year,
             SUM(f.total_claims) as total_claims,
@@ -48,7 +46,7 @@ def task9_market_size(con) -> pd.DataFrame:
           AND f.is_suppressed = false
         GROUP BY f.year
         ORDER BY f.year
-    """).fetchdf()
+    """, conn)
 
     print(market_yearly.to_string(index=False))
     return market_yearly
@@ -75,12 +73,12 @@ def task10_market_growth(market_yearly: pd.DataFrame) -> pd.DataFrame:
 # ===================================================================
 # TASK 11 — Drug market share
 # ===================================================================
-def task11_drug_market_share(con, market_yearly: pd.DataFrame) -> pd.DataFrame:
+def task11_drug_market_share(conn, market_yearly: pd.DataFrame) -> pd.DataFrame:
     print(f"\n{'='*60}")
     print("TASK 11 — Drug market share")
     print(f"{'='*60}")
 
-    drug_yearly = con.execute("""
+    drug_yearly = pd.read_sql("""
         SELECT
             f.year,
             f.brand_name,
@@ -95,7 +93,7 @@ def task11_drug_market_share(con, market_yearly: pd.DataFrame) -> pd.DataFrame:
           AND f.is_suppressed = false
         GROUP BY f.year, f.brand_name, f.generic_name, d.diabetes_class
         ORDER BY f.year, drug_fills DESC
-    """).fetchdf()
+    """, conn)
 
     # Merge total fills for market share calculation
     drug_yearly = drug_yearly.merge(
@@ -163,7 +161,7 @@ def task13_growth_leaders(drug_yearly: pd.DataFrame) -> pd.DataFrame:
         np.nan
     )
 
-    # For meaningful scale: filter drugs with ≥ 1000 fills
+    # For meaningful scale: filter drugs with ≥ 500 fills
     recent = dy[(dy["year"] == 2024) & (dy["drug_fills"] >= 500)].copy()
 
     print("  === Largest market share (2024) ===")
@@ -190,15 +188,14 @@ def task13_growth_leaders(drug_yearly: pd.DataFrame) -> pd.DataFrame:
 
 
 def main():
-    con = duckdb.connect(DB_PATH, read_only=True)
+    engine = get_db_engine()
 
-    market_yearly = task9_market_size(con)
-    market_yearly = task10_market_growth(market_yearly)
-    drug_yearly = task11_drug_market_share(con, market_yearly)
-    therapy_yearly = task12_class_performance(drug_yearly)
-    growth_leaders = task13_growth_leaders(drug_yearly)
-
-    con.close()
+    with engine.connect() as conn:
+        market_yearly = task9_market_size(conn)
+        market_yearly = task10_market_growth(market_yearly)
+        drug_yearly = task11_drug_market_share(conn, market_yearly)
+        therapy_yearly = task12_class_performance(drug_yearly)
+        growth_leaders = task13_growth_leaders(drug_yearly)
 
     # Save outputs
     market_yearly.to_csv("outputs/market_yearly.csv", index=False)
@@ -212,3 +209,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

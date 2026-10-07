@@ -25,8 +25,7 @@ This project is structured around key pharmaceutical commercial analytics capabi
 HCProject/
 ├── data/                       # Database & tabular files
 │   ├── raw/                    # CMS Part D raw source CSVs
-│   ├── processed/              # Cleaned dimension & fact tables
-│   └── hcproject.duckdb        # Embedded analytical database (Star Schema)
+│   └── processed/              # Cleaned dimension & fact tables
 ├── docs/                       # Project documentation
 │   ├── DATA_DICTIONARY.md      # Detailed column definitions & datatypes
 │   └── DIABETES_MARKET_DEFINITION.md # Therapeutic class mapping & inclusion criteria
@@ -44,12 +43,12 @@ HCProject/
 ├── scripts/                    # End-to-end Python pipeline scripts
 │   ├── 00_generate_raw_data.py # Synthetic CMS data generator (2019-2024)
 │   ├── 01_data_dictionary.py   # Schema & market definition generator
-│   ├── 02_clean_combine_load.py # Cleaning, suppression handling, DuckDB star schema
+│   ├── 02_clean_combine_load.py # Cleaning, suppression handling, Supabase PostgreSQL star schema
 │   ├── 03_market_analytics.py  # Market size, growth, and therapy share calculations
 │   ├── 04_hcp_analytics.py     # HCP feature engineering & K-Means clustering
 │   ├── 05_adoption_geography_opportunity.py # Opportunity score & sensitivity matrix
 │   ├── 06_forecasting.py       # Time series backtesting & 2-year scenario forecasting
-│   ├── 07_statistical_analysis.py # Non-parametric tests & DuckDB table staging
+│   ├── 07_statistical_analysis.py # Non-parametric tests & Supabase PostgreSQL table staging
 │   ├── 08_quality_check.py     # 20-point automated quality check
 │   └── run_pipeline.py         # One-click Master Pipeline Orchestrator
 └── README.md

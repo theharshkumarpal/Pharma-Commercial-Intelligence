@@ -50,7 +50,7 @@ def main():
     print(f"PIPELINE COMPLETE — Total time: {total:.1f}s")
     print(f"{'='*70}")
     print(f"\nOutputs saved to:")
-    print(f"  data/hcproject.duckdb   — Analytical database")
+    print(f"  Supabase PostgreSQL    — Cloud Analytical database")
     print(f"  outputs/                — CSV/JSON analytical tables")
     print(f"  docs/                   — Data dictionary & market definition")
     print(f"\n✅ Ready for Power BI.")

@@ -17,15 +17,19 @@ import json
 import requests
 import certifi
 import numpy as np
+import os
+import time
+import json
+import requests
+import certifi
+import numpy as np
 import pandas as pd
-import duckdb
 
 # ---------------------------------------------------------------------------
 # CONFIG
 # ---------------------------------------------------------------------------
 RAW_DIR = "data/raw"
 PROCESSED_DIR = "data/processed"
-DB_PATH = "data/hcproject.duckdb"
 YEARS = [2019, 2020, 2021, 2022, 2023, 2024]
 
 os.makedirs(PROCESSED_DIR, exist_ok=True)
@@ -278,124 +282,120 @@ def lock_diabetes_market(dim_drug: pd.DataFrame) -> pd.DataFrame:
 
 
 # ===================================================================
-# TASK 7 — Load into DuckDB
+# TASK 7 — Load into Supabase PostgreSQL
 # ===================================================================
 def load_database(fact: pd.DataFrame, dim_drug: pd.DataFrame):
-    """Load all tables into DuckDB analytical database."""
+    """Load all tables into Supabase PostgreSQL analytical database."""
     print(f"\n{'='*60}")
-    print("TASK 7 — Loading into DuckDB")
+    print("TASK 7 — Loading into Supabase PostgreSQL")
     print(f"{'='*60}")
 
-    # Remove existing DB for clean load
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
+    from db import get_db_engine
+    engine = get_db_engine()
 
-    con = duckdb.connect(DB_PATH)
+    with engine.begin() as conn:
+        # dim_drug
+        dim_drug.to_sql("dim_drug", conn, if_exists="replace", index=False)
+        print("  dim_drug loaded")
 
-    # DuckDB accesses pandas DataFrames directly by variable name in SQL
-    # dim_drug
-    dim_drug_tbl = dim_drug  # noqa: F841
-    con.execute("CREATE TABLE dim_drug AS SELECT * FROM dim_drug_tbl")
-    print(f"  dim_drug: {con.execute('SELECT COUNT(*) FROM dim_drug').fetchone()[0]} rows")
+        # dim_provider
+        providers = fact[["npi", "specialty", "state"]].drop_duplicates(subset=["npi"]).reset_index(drop=True)
+        providers.to_sql("dim_provider", conn, if_exists="replace", index=False)
+        print("  dim_provider loaded")
 
-    # dim_provider
-    providers = fact[["npi", "specialty", "state"]].drop_duplicates(subset=["npi"]).reset_index(drop=True)
-    con.execute("CREATE TABLE dim_provider AS SELECT * FROM providers")
-    print(f"  dim_provider: {con.execute('SELECT COUNT(*) FROM dim_provider').fetchone()[0]} rows")
+        # dim_year
+        years_df = pd.DataFrame({"year": YEARS})
+        years_df.to_sql("dim_year", conn, if_exists="replace", index=False)
+        print("  dim_year loaded")
 
-    # dim_year
-    years_df = pd.DataFrame({"year": YEARS})
-    con.execute("CREATE TABLE dim_year AS SELECT * FROM years_df")
-    print(f"  dim_year: {con.execute('SELECT COUNT(*) FROM dim_year').fetchone()[0]} rows")
+        # fact_prescriptions — join with drug_id
+        fact_with_drug = fact.merge(
+            dim_drug[["drug_id", "brand_name", "generic_name"]],
+            on=["brand_name", "generic_name"],
+            how="left"
+        )
+        fact_with_drug.to_sql("fact_prescriptions", conn, if_exists="replace", index=False)
+        print("  fact_prescriptions loaded")
 
-    # fact_prescriptions — join with drug_id
-    fact_with_drug = fact.merge(
-        dim_drug[["drug_id", "brand_name", "generic_name"]],
-        on=["brand_name", "generic_name"],
-        how="left"
-    )
-    con.execute("CREATE TABLE fact_prescriptions AS SELECT * FROM fact_with_drug")
-    print(f"  fact_prescriptions: {con.execute('SELECT COUNT(*) FROM fact_prescriptions').fetchone()[0]} rows")
-
-    con.close()
-    print(f"  Database saved to {DB_PATH}")
+    print("  Database loaded into Supabase PostgreSQL successfully")
 
 
 # ===================================================================
 # TASK 8 — Validate the database
 # ===================================================================
 def validate_database():
-    """Run comprehensive validation checks."""
+    """Run comprehensive validation checks against Supabase PostgreSQL."""
     print(f"\n{'='*60}")
-    print("TASK 8 — Validating the database")
+    print("TASK 8 — Validating the database (Supabase PostgreSQL)")
     print(f"{'='*60}")
 
-    con = duckdb.connect(DB_PATH, read_only=True)
+    from db import get_db_engine
+    engine = get_db_engine()
     report = {}
 
-    # Row counts per year
-    rc = con.execute("SELECT year, COUNT(*) as cnt FROM fact_prescriptions GROUP BY year ORDER BY year").fetchdf()
-    print("\n  Row counts per year:")
-    for _, r in rc.iterrows():
-        print(f"    {int(r['year'])}: {int(r['cnt']):,}")
-    report["row_counts_per_year"] = rc.set_index("year")["cnt"].to_dict()
+    with engine.connect() as conn:
+        # Row counts per year
+        rc = pd.read_sql("SELECT year, COUNT(*) as cnt FROM fact_prescriptions GROUP BY year ORDER BY year", conn)
+        print("\n  Row counts per year:")
+        for _, r in rc.iterrows():
+            print(f"    {int(r['year'])}: {int(r['cnt']):,}")
+        report["row_counts_per_year"] = rc.set_index("year")["cnt"].to_dict()
 
-    # Unique key check (year + npi + brand_name + generic_name)
-    dup_check = con.execute("""
-        SELECT year, npi, brand_name, generic_name, COUNT(*) as cnt
-        FROM fact_prescriptions
-        GROUP BY year, npi, brand_name, generic_name
-        HAVING COUNT(*) > 1
-    """).fetchdf()
-    n_dup_keys = len(dup_check)
-    print(f"\n  Duplicate key combinations: {n_dup_keys}")
-    report["duplicate_key_combinations"] = int(n_dup_keys)
+        # Unique key check (year + npi + brand_name + generic_name)
+        dup_check = pd.read_sql("""
+            SELECT year, npi, brand_name, generic_name, COUNT(*) as cnt
+            FROM fact_prescriptions
+            GROUP BY year, npi, brand_name, generic_name
+            HAVING COUNT(*) > 1
+        """, conn)
+        n_dup_keys = len(dup_check)
+        print(f"\n  Duplicate key combinations: {n_dup_keys}")
+        report["duplicate_key_combinations"] = int(n_dup_keys)
 
-    # Missing percentages
-    miss = con.execute("""
-        SELECT
-            COUNT(*) as total,
-            SUM(CASE WHEN total_claims IS NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as pct_missing_claims,
-            SUM(CASE WHEN total_30day_fills IS NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as pct_missing_fills,
-            SUM(CASE WHEN total_drug_cost IS NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as pct_missing_cost,
-            SUM(CASE WHEN is_suppressed THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as pct_suppressed
-        FROM fact_prescriptions
-    """).fetchdf()
-    print(f"\n  Total records: {int(miss['total'].iloc[0]):,}")
-    print(f"  % missing claims: {miss['pct_missing_claims'].iloc[0]:.2f}%")
-    print(f"  % missing fills:  {miss['pct_missing_fills'].iloc[0]:.2f}%")
-    print(f"  % missing cost:   {miss['pct_missing_cost'].iloc[0]:.2f}%")
-    print(f"  % suppressed:     {miss['pct_suppressed'].iloc[0]:.2f}%")
+        # Missing percentages
+        miss = pd.read_sql("""
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN total_claims IS NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as pct_missing_claims,
+                SUM(CASE WHEN total_30day_fills IS NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as pct_missing_fills,
+                SUM(CASE WHEN total_drug_cost IS NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as pct_missing_cost,
+                SUM(CASE WHEN is_suppressed THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as pct_suppressed
+            FROM fact_prescriptions
+        """, conn)
+        print(f"\n  Total records: {int(miss['total'].iloc[0]):,}")
+        print(f"  % missing claims: {miss['pct_missing_claims'].iloc[0]:.2f}%")
+        print(f"  % missing fills:  {miss['pct_missing_fills'].iloc[0]:.2f}%")
+        print(f"  % missing cost:   {miss['pct_missing_cost'].iloc[0]:.2f}%")
+        print(f"  % suppressed:     {miss['pct_suppressed'].iloc[0]:.2f}%")
 
-    # Aggregates
-    aggs = con.execute("""
-        SELECT
-            SUM(total_claims) as total_claims,
-            SUM(total_30day_fills) as total_fills,
-            SUM(total_drug_cost) as total_spending,
-            COUNT(DISTINCT npi) as unique_providers,
-            COUNT(DISTINCT brand_name) as unique_drugs
-        FROM fact_prescriptions
-        WHERE NOT is_suppressed
-    """).fetchdf()
-    print(f"\n  Total claims (non-suppressed): {aggs['total_claims'].iloc[0]:,.0f}")
-    print(f"  Total fills (non-suppressed):  {aggs['total_fills'].iloc[0]:,.0f}")
-    print(f"  Total spending (non-suppressed): ${aggs['total_spending'].iloc[0]:,.2f}")
-    print(f"  Unique providers: {int(aggs['unique_providers'].iloc[0]):,}")
-    print(f"  Unique drugs: {int(aggs['unique_drugs'].iloc[0])}")
+        # Aggregates
+        aggs = pd.read_sql("""
+            SELECT
+                SUM(total_claims) as total_claims,
+                SUM(total_30day_fills) as total_fills,
+                SUM(total_drug_cost) as total_spending,
+                COUNT(DISTINCT npi) as unique_providers,
+                COUNT(DISTINCT brand_name) as unique_drugs
+            FROM fact_prescriptions
+            WHERE NOT is_suppressed
+        """, conn)
+        print(f"\n  Total claims (non-suppressed): {aggs['total_claims'].iloc[0]:,.0f}")
+        print(f"  Total fills (non-suppressed):  {aggs['total_fills'].iloc[0]:,.0f}")
+        print(f"  Total spending (non-suppressed): ${aggs['total_spending'].iloc[0]:,.2f}")
+        print(f"  Unique providers: {int(aggs['unique_providers'].iloc[0]):,}")
+        print(f"  Unique drugs: {int(aggs['unique_drugs'].iloc[0])}")
 
-    report["total_claims"] = float(aggs["total_claims"].iloc[0])
-    report["total_fills"] = float(aggs["total_fills"].iloc[0])
-    report["total_spending"] = float(aggs["total_spending"].iloc[0])
-    report["unique_providers"] = int(aggs["unique_providers"].iloc[0])
-    report["unique_drugs"] = int(aggs["unique_drugs"].iloc[0])
+        report["total_claims"] = float(aggs["total_claims"].iloc[0])
+        report["total_fills"] = float(aggs["total_fills"].iloc[0])
+        report["total_spending"] = float(aggs["total_spending"].iloc[0])
+        report["unique_providers"] = int(aggs["unique_providers"].iloc[0])
+        report["unique_drugs"] = int(aggs["unique_drugs"].iloc[0])
 
     # Save validation report
     with open("outputs/validation_report.json", "w") as f:
         json.dump(report, f, indent=2, default=str)
     print("\n  Validation report saved to outputs/validation_report.json")
 
-    con.close()
     return report
 
 
@@ -419,7 +419,7 @@ def main():
     diabetes_drugs = lock_diabetes_market(dim_drug)
 
     # Save processed files
-    fact.to_parquet(f"{PROCESSED_DIR}/fact_prescriptions.parquet", index=False)
+    fact.to_csv(f"{PROCESSED_DIR}/fact_prescriptions.csv", index=False)
     dim_drug.to_csv(f"{PROCESSED_DIR}/dim_drug.csv", index=False)
     print(f"\n  Processed data saved to {PROCESSED_DIR}/")
 
@@ -436,3 +436,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -2,7 +2,7 @@
   "correlations": {
     "volume_vs_growth": {
       "spearman_r": 0.0361,
-      "p_value": 0.01585393509866644,
+      "p_value": 0.015855781018609332,
       "n": 4459,
       "interpretation": "Negative correlation expected: high-volume prescribers have less room to grow"
     },
@@ -20,7 +20,7 @@
     },
     "brand_share_vs_volume": {
       "spearman_r": 0.0183,
-      "p_value": 0.22072898436106062,
+      "p_value": 0.22072638716653503,
       "n": 4500,
       "interpretation": "Tests whether higher-volume prescribers use more branded therapies"
     }
@@ -28,19 +28,19 @@
   "segment_comparisons": {
     "glp1_adoption_across_segments": {
       "test": "Kruskal-Wallis H",
-      "statistic": 184.334,
-      "p_value": 9.383724004964953e-41,
-      "effect_size_eta_sq": 0.041,
-      "n_segments": 3,
+      "statistic": 78.9462,
+      "p_value": 6.382341456583634e-19,
+      "effect_size_eta_sq": 0.0175,
+      "n_segments": 2,
       "total_n": 4455,
       "conclusion": "Significant",
       "interpretation": "Tests whether GLP-1 adoption differs significantly across HCP segments"
     },
     "volume_across_segments": {
       "test": "Kruskal-Wallis H",
-      "statistic": 3025.0488,
+      "statistic": 2803.0379,
       "p_value": 0.0,
-      "effect_size_eta_sq": 0.679,
+      "effect_size_eta_sq": 0.6292,
       "conclusion": "Significant"
     },
     "glp1_by_specialty": {

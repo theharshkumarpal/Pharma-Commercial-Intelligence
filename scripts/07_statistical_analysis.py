@@ -9,12 +9,10 @@ import json
 import warnings
 import numpy as np
 import pandas as pd
-import duckdb
 from scipy import stats
+from db import get_db_engine
 
 warnings.filterwarnings("ignore")
-
-DB_PATH = "data/hcproject.duckdb"
 
 
 # ===================================================================
@@ -105,10 +103,7 @@ def task36_segment_comparison(hcp: pd.DataFrame) -> dict:
         groups = [g for g in groups if len(g) >= 5]
 
         if len(groups) >= 2:
-            # Kruskal-Wallis (non-parametric, handles non-normal distributions)
             stat, p = stats.kruskal(*groups)
-
-            # Effect size (eta-squared for Kruskal-Wallis)
             N = sum(len(g) for g in groups)
             k = len(groups)
             eta_sq = (stat - k + 1) / (N - k)
@@ -129,7 +124,6 @@ def task36_segment_comparison(hcp: pd.DataFrame) -> dict:
             print(f"    Effect size (eta²)={eta_sq:.4f}")
             print(f"    {'Significant at α=0.05' if p < 0.05 else 'Not significant at α=0.05'}")
 
-            # Segment-level descriptives
             for s in segments:
                 seg_data = hcp[hcp["segment_name"] == s]["glp1_share"].dropna()
                 if len(seg_data) > 0:
@@ -168,12 +162,8 @@ def task36_segment_comparison(hcp: pd.DataFrame) -> dict:
 
             if len(g_high) >= 5 and len(g_low) >= 5:
                 u_stat, u_p = stats.mannwhitneyu(g_high, g_low, alternative="two-sided")
-
-                # Effect size: rank-biserial correlation
                 n1, n2 = len(g_high), len(g_low)
                 r_effect = 1 - (2 * u_stat) / (n1 * n2)
-
-                # 95% CI using bootstrap (simplified)
                 diff = g_high.mean() - g_low.mean()
 
                 results["high_vs_low_growth_segments"] = {
@@ -217,83 +207,48 @@ def task36_segment_comparison(hcp: pd.DataFrame) -> dict:
 # ===================================================================
 # TASK 37 — Create final analytical tables
 # ===================================================================
-def task37_final_tables(con) -> None:
+def task37_final_tables(engine) -> None:
     print(f"\n{'='*60}")
-    print("TASK 37 — Creating final analytical tables")
+    print("TASK 37 — Creating final analytical tables in Supabase PostgreSQL")
     print(f"{'='*60}")
 
-    # 1. market_yearly
     market_yearly = pd.read_csv("outputs/market_yearly.csv")
-    print(f"  market_yearly: {len(market_yearly)} rows, {list(market_yearly.columns)}")
-
-    # 2. drug_yearly
     drug_yearly = pd.read_csv("outputs/drug_yearly.csv")
-    print(f"  drug_yearly: {len(drug_yearly)} rows")
-
-    # 3. therapy_yearly
     therapy_yearly = pd.read_csv("outputs/therapy_yearly.csv")
-    print(f"  therapy_yearly: {len(therapy_yearly)} rows")
-
-    # 4. hcp_features
     hcp_features = pd.read_csv("outputs/hcp_features.csv")
-    print(f"  hcp_features: {len(hcp_features)} rows, {len(hcp_features.columns)} columns")
 
-    # 5. hcp_segments (extract cluster info)
-    if "segment_name" in hcp_features.columns:
-        hcp_segments = hcp_features[["npi", "specialty", "state", "cluster", "segment_name",
-                                      "total_fills", "yoy_growth", "brand_share"]].copy()
-        hcp_segments.to_csv("outputs/hcp_segments.csv", index=False)
-        print(f"  hcp_segments: {len(hcp_segments)} rows")
-
-    # 6. state_opportunity
-    state_opp = pd.read_csv("outputs/state_opportunity.csv")
-    print(f"  state_opportunity: {len(state_opp)} rows")
-
-    # 7. hcp_opportunity
-    hcp_opp = pd.read_csv("outputs/hcp_opportunity.csv")
-    print(f"  hcp_opportunity: {len(hcp_opp)} rows")
-
-    # 8. forecast
-    forecast = pd.read_csv("outputs/forecast.csv")
-    print(f"  forecast: {len(forecast)} rows")
-
-    # Load all into DuckDB as final analytical tables
     tables_to_load = {
         "market_yearly": market_yearly,
         "drug_yearly": drug_yearly,
         "therapy_yearly": therapy_yearly,
         "hcp_features": hcp_features,
-        "state_opportunity": state_opp,
-        "hcp_opportunity": hcp_opp,
-        "forecast": forecast,
+        "state_opportunity": pd.read_csv("outputs/state_opportunity.csv"),
+        "hcp_opportunity": pd.read_csv("outputs/hcp_opportunity.csv"),
+        "forecast": pd.read_csv("outputs/forecast.csv"),
     }
+
     if "segment_name" in hcp_features.columns:
+        hcp_segments = hcp_features[["npi", "specialty", "state", "cluster", "segment_name",
+                                      "total_fills", "yoy_growth", "brand_share"]].copy()
+        hcp_segments.to_csv("outputs/hcp_segments.csv", index=False)
         tables_to_load["hcp_segments"] = hcp_segments
 
-    for tname, tdf in tables_to_load.items():
-        con.execute(f"DROP TABLE IF EXISTS {tname}")
-        con.execute(f"CREATE TABLE {tname} AS SELECT * FROM tdf")
-        cnt = con.execute(f"SELECT COUNT(*) FROM {tname}").fetchone()[0]
-        print(f"  Loaded {tname} into DuckDB: {cnt:,} rows")
+    with engine.begin() as conn:
+        for tname, tdf in tables_to_load.items():
+            tdf.to_sql(tname, conn, if_exists="replace", index=False)
+            print(f"  Loaded {tname} into Supabase PostgreSQL: {len(tdf):,} rows")
 
-    print("\n  All final analytical tables loaded into DuckDB")
+    print("\n  All final analytical tables loaded into Supabase PostgreSQL")
 
 
 def main():
     hcp = pd.read_csv("outputs/hcp_features.csv")
-    con = duckdb.connect(DB_PATH)
+    engine = get_db_engine()
 
-    # TASK 35
     corr_results = task35_correlation(hcp)
-
-    # TASK 36
     segment_results = task36_segment_comparison(hcp)
+    task37_final_tables(engine)
 
-    # TASK 37
-    task37_final_tables(con)
-    con.close()
-
-    # Save statistical results
     all_stats = {
         "correlations": corr_results,
         "segment_comparisons": segment_results,
@@ -310,3 +265,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

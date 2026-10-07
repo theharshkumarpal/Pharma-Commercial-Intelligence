@@ -15,25 +15,23 @@ import json
 import warnings
 import numpy as np
 import pandas as pd
-import duckdb
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from db import get_db_engine
 
 warnings.filterwarnings("ignore")
-
-DB_PATH = "data/hcproject.duckdb"
 
 
 # ===================================================================
 # TASK 14 — HCP-level features
 # ===================================================================
-def task14_hcp_features(con) -> pd.DataFrame:
+def task14_hcp_features(conn) -> pd.DataFrame:
     print(f"\n{'='*60}")
     print("TASK 14 — Creating HCP-level features")
     print(f"{'='*60}")
 
-    hcp = con.execute("""
+    hcp = pd.read_sql("""
         SELECT
             f.npi,
             f.state,
@@ -48,7 +46,7 @@ def task14_hcp_features(con) -> pd.DataFrame:
         WHERE d.diabetes_class IS NOT NULL
           AND f.is_suppressed = false
         GROUP BY f.npi, f.state, f.specialty
-    """).fetchdf()
+    """, conn)
 
     # Therapy share = each HCP's diabetes fills / total diabetes fills
     total_market_fills = hcp["total_fills"].sum()
@@ -63,12 +61,12 @@ def task14_hcp_features(con) -> pd.DataFrame:
 # ===================================================================
 # TASK 15 — Focal-therapy features
 # ===================================================================
-def task15_focal_therapy(con, hcp: pd.DataFrame) -> pd.DataFrame:
+def task15_focal_therapy(conn, hcp: pd.DataFrame) -> pd.DataFrame:
     print(f"\n{'='*60}")
     print("TASK 15 — Focal-therapy features")
     print(f"{'='*60}")
 
-    focal = con.execute("""
+    focal = pd.read_sql("""
         SELECT
             f.npi,
             d.diabetes_class,
@@ -78,7 +76,7 @@ def task15_focal_therapy(con, hcp: pd.DataFrame) -> pd.DataFrame:
         WHERE d.diabetes_class IS NOT NULL
           AND f.is_suppressed = false
         GROUP BY f.npi, d.diabetes_class
-    """).fetchdf()
+    """, conn)
 
     # Pivot to get fills per class per HCP
     pivot = focal.pivot_table(index="npi", columns="diabetes_class",
@@ -126,20 +124,20 @@ def task15_focal_therapy(con, hcp: pd.DataFrame) -> pd.DataFrame:
 # ===================================================================
 # TASK 16 — HCP growth
 # ===================================================================
-def task16_hcp_growth(con, hcp: pd.DataFrame) -> pd.DataFrame:
+def task16_hcp_growth(conn, hcp: pd.DataFrame) -> pd.DataFrame:
     print(f"\n{'='*60}")
     print("TASK 16 — HCP growth")
     print(f"{'='*60}")
 
     # Get fills by year per HCP
-    yearly = con.execute("""
+    yearly = pd.read_sql("""
         SELECT f.npi, f.year, SUM(f.total_30day_fills) as year_fills
         FROM fact_prescriptions f
         JOIN dim_drug d ON f.drug_id = d.drug_id
         WHERE d.diabetes_class IS NOT NULL
           AND f.is_suppressed = false
         GROUP BY f.npi, f.year
-    """).fetchdf()
+    """, conn)
 
     # 2023 vs 2024 growth
     y23 = yearly[yearly["year"] == 2023].set_index("npi")["year_fills"].rename("fills_2023")
@@ -179,10 +177,6 @@ def task17_behavioral_dataset(hcp: pd.DataFrame) -> pd.DataFrame:
     print("TASK 17 — HCP behavioral dataset")
     print(f"{'='*60}")
 
-    # Brand share: non-generic drugs / total (estimate: branded = drugs with distinct brand vs generic)
-    # We'll approximate brand share as the share of fills from branded drugs
-    # (In our data, drugs like OZEMPIC, JARDIANCE etc. are branded; METFORMIN, GLIPIZIDE are generic)
-    # Use fills from high-cost drugs as proxy for brand share
     branded_cols = ["glp1_fills", "sglt2_fills", "dpp4_fills", "insulin_fills"]
     avail_cols = [c for c in branded_cols if c in hcp.columns]
     hcp["brand_fills"] = hcp[avail_cols].sum(axis=1)
@@ -192,7 +186,6 @@ def task17_behavioral_dataset(hcp: pd.DataFrame) -> pd.DataFrame:
         0
     )
 
-    # Final ML table
     ml_cols = ["npi", "specialty", "state", "total_fills", "yoy_growth",
                "therapy_share", "unique_drugs", "brand_share",
                "glp1_share", "sglt2_share", "insulin_share"]
@@ -213,15 +206,12 @@ def task18_22_segmentation(hcp: pd.DataFrame) -> pd.DataFrame:
     print("TASK 18 — Preparing ML features")
     print(f"{'='*60}")
 
-    # TASK 18 — Select exactly these core features
     feature_cols = ["total_fills", "yoy_growth", "therapy_share", "unique_drugs", "brand_share"]
     ml_data = hcp[["npi"] + feature_cols].copy()
 
-    # Drop rows with NaN in feature columns
     ml_data = ml_data.dropna(subset=feature_cols)
     print(f"  Records for clustering: {len(ml_data):,}")
 
-    # TASK 19 — Handle outliers: log-transform fills (highly skewed)
     print(f"\n{'='*60}")
     print("TASK 19 — Handling outliers")
     print(f"{'='*60}")
@@ -229,7 +219,6 @@ def task18_22_segmentation(hcp: pd.DataFrame) -> pd.DataFrame:
     print(f"  Fills skewness before log: {ml_data['total_fills'].skew():.2f}")
     print(f"  Fills skewness after log:  {ml_data['total_fills_log'].skew():.2f}")
 
-    # Use log-transformed fills for clustering
     cluster_features = ["total_fills_log", "yoy_growth", "therapy_share", "unique_drugs", "brand_share"]
     X = ml_data[cluster_features].values
 
@@ -237,7 +226,6 @@ def task18_22_segmentation(hcp: pd.DataFrame) -> pd.DataFrame:
     X_scaled = scaler.fit_transform(X)
     print(f"  Features standardized: {cluster_features}")
 
-    # TASK 20 — Determine optimal K
     print(f"\n{'='*60}")
     print("TASK 20 — Determining optimal K")
     print(f"{'='*60}")
@@ -255,13 +243,11 @@ def task18_22_segmentation(hcp: pd.DataFrame) -> pd.DataFrame:
         print(f"  K={k}: Inertia={km.inertia_:,.0f}, Silhouette={sil:.4f}")
 
     best_k_idx = np.argmax(silhouettes)
-    # Balance interpretability: prefer K=4 if silhouette is close to max
     best_k = k_range[best_k_idx]
     if best_k == 2 and silhouettes[2] > 0.85 * silhouettes[0]:
-        best_k = 4  # 4 is more interpretable for pharma segmentation
+        best_k = 4
     print(f"\n  Selected K={best_k} (best interpretable solution)")
 
-    # TASK 21 — Run K-Means
     print(f"\n{'='*60}")
     print(f"TASK 21 — Running K-Means (K={best_k})")
     print(f"{'='*60}")
@@ -272,18 +258,13 @@ def task18_22_segmentation(hcp: pd.DataFrame) -> pd.DataFrame:
     for c, cnt in ml_data["cluster"].value_counts().sort_index().items():
         print(f"    Cluster {c}: {cnt:,} HCPs")
 
-    # TASK 22 — Interpret clusters
     print(f"\n{'='*60}")
     print("TASK 22 — Interpreting clusters")
     print(f"{'='*60}")
 
-    cluster_profiles = ml_data.groupby("cluster")[feature_cols].agg(["mean", "median"]).round(2)
-    print("\n  Cluster feature means:")
-
     cluster_means = ml_data.groupby("cluster")[feature_cols].mean().round(2)
     print(cluster_means.to_string())
 
-    # Auto-assign business names based on characteristics
     cluster_names = {}
     for c in range(best_k):
         row = cluster_means.loc[c]
@@ -303,11 +284,8 @@ def task18_22_segmentation(hcp: pd.DataFrame) -> pd.DataFrame:
               f"Drugs: {row['unique_drugs']:.1f}, Brand: {row['brand_share']:.1f}%")
 
     ml_data["segment_name"] = ml_data["cluster"].map(cluster_names)
-
-    # Merge cluster assignments back to main HCP table
     hcp = hcp.merge(ml_data[["npi", "cluster", "segment_name"]], on="npi", how="left")
 
-    # Save cluster analysis
     cluster_analysis = {
         "k_selected": best_k,
         "silhouette_scores": dict(zip([str(k) for k in k_range], silhouettes)),
@@ -322,19 +300,16 @@ def task18_22_segmentation(hcp: pd.DataFrame) -> pd.DataFrame:
 
 
 def main():
-    con = duckdb.connect(DB_PATH, read_only=True)
+    engine = get_db_engine()
 
-    hcp = task14_hcp_features(con)
-    hcp = task15_focal_therapy(con, hcp)
-    hcp = task16_hcp_growth(con, hcp)
-    hcp = task17_behavioral_dataset(hcp)
-    hcp = task18_22_segmentation(hcp)
+    with engine.connect() as conn:
+        hcp = task14_hcp_features(conn)
+        hcp = task15_focal_therapy(conn, hcp)
+        hcp = task16_hcp_growth(conn, hcp)
+        hcp = task17_behavioral_dataset(hcp)
+        hcp = task18_22_segmentation(hcp)
 
-    con.close()
-
-    # Save HCP features & segments
     hcp.to_csv("outputs/hcp_features.csv", index=False)
-    hcp.to_parquet("outputs/hcp_features.parquet", index=False)
 
     print(f"\n{'='*60}")
     print("TASKS 14-22 COMPLETE — HCP analytics & segmentation saved")
@@ -343,3 +318,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

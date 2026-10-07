@@ -11,20 +11,18 @@ TASKS 23–28: Drug Adoption, Geographic Opportunity, Opportunity Score
 import json
 import numpy as np
 import pandas as pd
-import duckdb
-
-DB_PATH = "data/hcproject.duckdb"
+from db import get_db_engine
 
 
 # ===================================================================
 # TASK 23 — Define HCP-level therapy adoption
 # ===================================================================
-def task23_adoption_definition(con) -> pd.DataFrame:
+def task23_adoption_definition(conn) -> pd.DataFrame:
     print(f"\n{'='*60}")
     print("TASK 23 — Defining HCP-level therapy adoption intensity")
     print(f"{'='*60}")
 
-    adoption = con.execute("""
+    adoption = pd.read_sql("""
         SELECT
             f.npi,
             f.year,
@@ -37,7 +35,7 @@ def task23_adoption_definition(con) -> pd.DataFrame:
         WHERE d.diabetes_class IS NOT NULL
           AND f.is_suppressed = false
         GROUP BY f.npi, f.year, f.specialty, f.state, d.diabetes_class
-    """).fetchdf()
+    """, conn)
 
     # Total diabetes fills per HCP per year
     hcp_totals = adoption.groupby(["npi", "year"])["therapy_fills"].sum().reset_index()
@@ -117,12 +115,12 @@ def task24_adoption_trends(adoption: pd.DataFrame, hcp: pd.DataFrame) -> dict:
 # ===================================================================
 # TASK 25 — State-level analytics
 # ===================================================================
-def task25_state_analytics(con) -> pd.DataFrame:
+def task25_state_analytics(conn) -> pd.DataFrame:
     print(f"\n{'='*60}")
     print("TASK 25 — Building state-level analytics")
     print(f"{'='*60}")
 
-    state_analytics = con.execute("""
+    state_analytics = pd.read_sql("""
         SELECT
             f.state,
             f.year,
@@ -136,10 +134,10 @@ def task25_state_analytics(con) -> pd.DataFrame:
           AND f.is_suppressed = false
         GROUP BY f.state, f.year
         ORDER BY f.state, f.year
-    """).fetchdf()
+    """, conn)
 
     # Add GLP-1 specific fills
-    glp1_state = con.execute("""
+    glp1_state = pd.read_sql("""
         SELECT
             f.state,
             f.year,
@@ -149,7 +147,7 @@ def task25_state_analytics(con) -> pd.DataFrame:
         WHERE d.diabetes_class = 'GLP-1 receptor agonists'
           AND f.is_suppressed = false
         GROUP BY f.state, f.year
-    """).fetchdf()
+    """, conn)
 
     state_analytics = state_analytics.merge(glp1_state, on=["state", "year"], how="left")
     state_analytics["glp1_fills"] = state_analytics["glp1_fills"].fillna(0)
@@ -314,17 +312,17 @@ def task28_sensitivity(opp: pd.DataFrame) -> dict:
 
 
 def main():
-    con = duckdb.connect(DB_PATH, read_only=True)
+    engine = get_db_engine()
     hcp = pd.read_csv("outputs/hcp_features.csv")
 
-    adoption = task23_adoption_definition(con)
-    trends = task24_adoption_trends(adoption, hcp)
-    state_analytics = task25_state_analytics(con)
+    with engine.connect() as conn:
+        adoption = task23_adoption_definition(conn)
+        trends = task24_adoption_trends(adoption, hcp)
+        state_analytics = task25_state_analytics(conn)
+
     growth_share = task26_growth_share_matrix(state_analytics)
     opp = task27_opportunity_score(hcp, state_analytics)
     sensitivity = task28_sensitivity(opp)
-
-    con.close()
 
     # Save outputs
     state_analytics.to_csv("outputs/state_opportunity.csv", index=False)
@@ -338,3 +336,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
